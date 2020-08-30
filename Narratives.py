@@ -38,13 +38,25 @@ class Narratives(SqlFuncs, Functions):
         connection = self.get_connection(self.connect)
         with connection.cursor() as cursor:
             # Getting narratives from narratives table
-            blogpost_ids_query = f"""SELECT JSON_KEYS(blogpost_narratives) AS blogpost_id from tracker_narratives where tid = {self.tid}"""
+            blogpost_ids_query = f"""
+                                    SELECT JSON_KEYS(blogpost_narratives) AS blogpost_id 
+                                    from tracker_narratives 
+                                    where tid = {self.tid}
+                                """
             cursor.execute(blogpost_ids_query)
             blogpost_ids = cursor.fetchall()[0]['blogpost_id']
 
             # self.blog_ids = self.blog_ids.replace('blogsite_id in', 'b.blogsite_id in')
             # query1 = f"""SELECT n.blogpost_id blogpost_id, n.narratives narratives, n.entity_count entity_count FROM blogposts b left join narratives n on b.blogpost_id = n.blogpost_id where {self.blog_ids} and b.blogpost_id not in {blogpost_ids.replace('[','(').replace(']',')')}"""
-            query1 = f"""SELECT blogpost_id, narratives, entity_count FROM narratives where {self.blog_ids} and blogpost_id not in {blogpost_ids.replace('[','(').replace(']',')')}"""
+            query1 = f"""
+                        SELECT a.blogpost_id, a.narratives, a.entity_count
+                        FROM (
+                            SELECT blogpost_id, narratives, entity_count 
+                            FROM narratives 
+                            where {self.blog_ids}
+                            ) a
+                        where a.blogpost_id not in {blogpost_ids.replace('[','(').replace(']',')')}
+                    """
             cursor.execute(query1)
             records = cursor.fetchall()
             
@@ -103,8 +115,8 @@ class Narratives(SqlFuncs, Functions):
             data_narratives = record['narratives']
             
             if narratives_record:
-                blogpost_entities_checked = ast.literal_eval(narratives_record[0]['blogpost_entities']) if 'blogpost_entities' in narratives_record[0] else None
-                blogpost_entities_checked[str(blogpostID)] = ast.literal_eval(entity_count)
+                blogpost_entities_checked = json.loads(narratives_record[0]['blogpost_entities']) if 'blogpost_entities' in narratives_record[0] else None
+                blogpost_entities_checked[str(blogpostID)] = json.loads(entity_count)
 
                 # x_ = dict(functools.reduce(operator.add, map(collections.Counter, blogpost_entities_checked.values())))
 
@@ -114,8 +126,8 @@ class Narratives(SqlFuncs, Functions):
                 # terms_sorted = json.dumps("{}")
 
                 blogpost_entities_checked = json.dumps(blogpost_entities_checked)
-                bp_narratives_checked = ast.literal_eval(narratives_record[0]['blogpost_narratives']) if 'blogpost_narratives' in narratives_record[0] else None     
-                bp_narratives_checked[str(blogpostID)] = ast.literal_eval(data_narratives)
+                bp_narratives_checked = json.loads(narratives_record[0]['blogpost_narratives']) if 'blogpost_narratives' in narratives_record[0] else None     
+                bp_narratives_checked[str(blogpostID)] = json.loads(data_narratives)
                 bp_narratives_checked = json.dumps(bp_narratives_checked)
 
                 # top_entity_checked = ast.literal_eval(narratives_record[0]['top_entities']) if 'top_entities' in narratives_record[0] else None
