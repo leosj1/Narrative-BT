@@ -4253,9 +4253,6 @@ antamatta
 antoi
 aoua
 apu
-asia
-asiaa
-asian
 asiasta
 asiat
 asioiden
@@ -5000,9 +4997,6 @@ antamatta
 antoi
 aoua
 apu
-asia
-asiaa
-asian
 asiasta
 asiat
 asioiden
@@ -5522,9 +5516,6 @@ antamatta
 antoi
 aoua
 apu
-asia
-asiaa
-asian
 asiasta
 asiat
 asioiden
@@ -6268,10 +6259,6 @@ antaa
 antamatta
 antoi
 aoua
-apu
-asia
-asiaa
-asian
 asiasta
 asiat
 asioiden

@@ -130,7 +130,8 @@ def process_posts(record):
     stop_words = []
     with open("stopwords.txt", "r", encoding="utf-8") as f:
         for line in f:
-            stop_words.append(str(line.strip()))
+            if line != '':
+                stop_words.append(str(line.strip()))
             
     new_stp_wrds = []
     
