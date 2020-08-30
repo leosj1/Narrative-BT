@@ -35,52 +35,54 @@ def process_narratives(connect, parallel, num_processes):
 
     with connection.cursor() as cursor:
         # Getting blogpost_id and posts from blogposts table
-        # query = f"""SELECT blogpost_id, post FROM blogtrackers.blogposts where blogpost_id not in (select blogpost_id from narratives) limit 10"""
-        query = f"""SELECT blogpost_id, post FROM blogtrackers.blogposts"""
+        query = f"""SELECT blogpost_id, post FROM blogtrackers.blogposts where blogpost_id not in (select blogpost_id from narratives)"""
+        # query = f"""SELECT blogpost_id, post, blogsite_id FROM blogtrackers.blogposts"""
         cursor.execute(query)
         records = cursor.fetchall()
         countPosts = countPosts + 1
 
-
-        if not parallel:
-            for record in tqdm(records, total=len(records), desc="Narratives"):
-                # blogpostID = record['blogpost_id']
-                # post = record['post']
-
-                # parameters = {}
-                # parameters['blogpostID'] = blogpostID
-                # parameters['post'] = post
-                # parameters['objectEntitiesList'] = objectEntitiesList
-                # parameters['connect'] = connect
-                # parameters['ListSentences_Unique'] = ListSentences_Unique
-                # parameters['entity_narrative_dict_list'] = entity_narrative_dict_list
-                # parameters['countSentTotal'] = countSentTotal
-                # parameters['countSentFiltered'] = countSentFiltered
-                # parameters['countSentFilteredTriplet'] = countSentFilteredTriplet
-                # parameters['textSentString'] = textSentString
-
-                # parameters = blogpostID, post, objectEntitiesList, connect, ListSentences_Unique, entity_narrative_dict_list, countSentTotal, countSentFiltered, countSentFilteredTriplet, textSentString
-                process_posts(record)            
-        else:
-            print("starting multi-process")
-            process_pool = ProcessPool(num_processes) 
-            pbar = tqdm(process_pool.imap(process_posts, records), desc="Narratives", ascii=True,  file=sys.stdout, total=len(records))
-            for x in pbar:
-                pbar.update(1)
-                
-
-            print("Finished processing!")
-
-            print("\nClosing pool")
-            process_pool.close()
-            print("Joining pool")
-            process_pool.join()
-            print("Clearing pool")
-            process_pool.clear()
-            print("Finished!")
-
     connection.close()
     cursor.close() 
+
+
+    if not parallel:
+        for record in tqdm(records, total=len(records), desc="Narratives"):
+            # blogpostID = record['blogpost_id']
+            # post = record['post']
+
+            # parameters = {}
+            # parameters['blogpostID'] = blogpostID
+            # parameters['post'] = post
+            # parameters['objectEntitiesList'] = objectEntitiesList
+            # parameters[ 'connect'] = connect
+            # parameters['ListSentences_Unique'] = ListSentences_Unique
+            # parameters['entity_narrative_dict_list'] = entity_narrative_dict_list
+            # parameters['countSentTotal'] = countSentTotal
+            # parameters['countSentFiltered'] = countSentFiltered
+            # parameters['countSentFilteredTriplet'] = countSentFilteredTriplet
+            # parameters['textSentString'] = textSentString
+
+            # parameters = blogpostID, post, objectEntitiesList, connect, ListSentences_Unique, entity_narrative_dict_list, countSentTotal, countSentFiltered, countSentFilteredTriplet, textSentString
+            process_posts(record)            
+    else:
+        print("starting multi-process")
+        process_pool = ProcessPool(num_processes) 
+        pbar = tqdm(process_pool.imap(process_posts, records), desc="Narratives", ascii=True,  file=sys.stdout, total=len(records))
+        for x in pbar:
+            pbar.update(1)
+            
+
+        print("Finished processing!")
+
+        print("\nClosing pool")
+        process_pool.close()
+        print("Joining pool")
+        process_pool.join()
+        print("Clearing pool")
+        process_pool.clear()
+        print("Finished!")
+
+    
 
 
 def process_posts(record):
@@ -99,7 +101,7 @@ def process_posts(record):
 
     connect = 'cosmos-1.host.ualr.edu', 'ukraine_user', 'summer2014', 'blogtrackers'
     s = SqlFuncs(connect)
-    connection = s.get_connection(connect)
+    # connection = s.get_connection(connect)
 
     # parameters = tid, blogpostID, blog_ids, post, objectEntitiesList, connect, ListSentences_Unique = [], entity_narrative_dict_list = [], countSentTotal = 0, countSentFiltered = 0, countSentFilteredTriplet = 0, textSentString = ''
 
@@ -162,11 +164,13 @@ def process_posts(record):
     sentences_scored = tokenize.sent_tokenize(result_scored)
     
     entity_count = []
+    # data_narratives = {}
 
     data_narratives = entity_narratives(sentences_scored, blogpostID, objectEntitiesList, entity_count)
 
-    if 'Duplicate entry' in s.update_insert('''INSERT INTO narratives (blogpost_id, narratives, entity_count) values (%s, %s, %s) ''', (blogpostID, json.dumps(data_narratives), json.dumps(entity_count)), connect):
-        s.update_insert('''UPDATE narratives SET narratives=%s, entity_count = %s WHERE blogpost_id=%s;  ''', (json.dumps(data_narratives), json.dumps(entity_count), blogpostID), connect)
+    if 'Duplicate entry' in s.update_insert('''INSERT INTO narratives (blogpost_id, blogsite_id, narratives, entity_count) values (%s, %s, %s, %s) ''', (blogpostID, record['blogsite_id'], json.dumps(data_narratives), json.dumps(entity_count)), connect):
+        s.update_insert('''UPDATE narratives SET narratives=%s, entity_count = %s, blogsite_id = %s WHERE blogpost_id=%s;  ''', (json.dumps(data_narratives), json.dumps(entity_count), record['blogsite_id'], blogpostID), connect)
+        # s.update_insert('''UPDATE narratives SET blogsite_id = %s WHERE blogpost_id=%s;  ''', (record['blogsite_id'], blogpostID), connect)
 
 if __name__ == "__main__":
     parallel = True
