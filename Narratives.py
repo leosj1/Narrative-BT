@@ -49,21 +49,28 @@ class Narratives(SqlFuncs, Functions):
             results = cursor.fetchall()
             if results:
                 blogpost_ids = results[0]['blogpost_id']
-                query1 = f"""
-                        SELECT a.blogpost_id, a.narratives, a.entity_count
-                        FROM (
-                            SELECT blogpost_id, narratives, entity_count 
-                            FROM narratives 
-                            where {self.blog_ids}
-                            ) a
-                        where a.blogpost_id not in {blogpost_ids.replace('[','(').replace(']',')')}
-                    """
+                if blogpost_ids != '[]':
+                    query1 = f"""
+                            SELECT a.blogpost_id, a.narratives, a.entity_count
+                            FROM (
+                                SELECT blogpost_id, narratives, entity_count 
+                                FROM narratives 
+                                where {self.blog_ids}
+                                ) a
+                            where a.blogpost_id not in {blogpost_ids.replace('[','(').replace(']',')')}
+                        """
+                else:
+                    query1 = f"""
+                                SELECT blogpost_id, narratives, entity_count 
+                                FROM narratives 
+                                where {self.blog_ids}
+                        """
             else:
-                query1 = f"""
-                            SELECT blogpost_id, narratives, entity_count 
-                            FROM narratives 
-                            where {self.blog_ids}
-                    """
+                    query1 = f"""
+                                SELECT blogpost_id, narratives, entity_count 
+                                FROM narratives 
+                                where {self.blog_ids}
+                        """
 
 
             # Getting narratives from narratives table
@@ -77,15 +84,16 @@ class Narratives(SqlFuncs, Functions):
         connection.close()
         cursor.close() 
 
-        self.process_main(records)
-        self.process_entity_count()
+        # self.process_main(records)
+        # self.process_entity_count()
 
-        # p1 = Process(target=self.process_entity_count)
-        # p2 = Process(target=self.process_main, args=(records, ))
-        # p1.start()
-        # p2.start()
-        # p1.join()
-        # p2.join()
+        p2 = Process(target=self.process_main, args=(records, ))
+        p1 = Process(target=self.process_entity_count)
+        p2.start()
+        p1.start()
+        p2.join()
+        p1.join()
+        
                        
     # process data in parallel or single process
     def process_main(self, records):
@@ -138,6 +146,10 @@ class Narratives(SqlFuncs, Functions):
             cursor.execute(entity_query)
             entity_record = cursor.fetchall()
 
+            narratives_query = f"""select blogpost_entities, blogpost_narratives, top_entities from tracker_narratives where tid = {self.tid}"""
+            cursor.execute(narratives_query)
+            narratives_record = cursor.fetchall()
+
         connection.close()
         cursor.close()
 
@@ -147,10 +159,13 @@ class Narratives(SqlFuncs, Functions):
             occurrence = entity['occurrence']
             top_entities[term] = int(occurrence)
 
-        data = json.dumps(top_entities), self.tid
-        self.update_insert("update tracker_narratives set top_entities = %s where tid = %s", data, connect)
-        print('entity_done')
-
+        if narratives_record:
+            data = json.dumps(top_entities), self.tid
+            self.update_insert("update tracker_narratives set top_entities = %s where tid = %s", data, connect)
+        else:
+            data = (self.tid, '{}', '{}', json.dumps(top_entities), self.blog_ids)
+            self.update_insert("insert into tracker_narratives (tid, blogpost_entities, blogpost_narratives, top_entities, query) values (%s, %s, %s, %s, %s)", data, connect)
+        
 
 
     # Process, insert or update narratives for tracker
@@ -186,8 +201,8 @@ class Narratives(SqlFuncs, Functions):
                 temp_narratives_checked = json.dumps(temp_narratives_checked)
 
                 # terms_sorted = json.dumps({k: int(v) for k, v in sorted(ast.literal_eval(entity_count).items(), key=lambda item: item[1], reverse = True) if k != '.'})
-                data = self.tid, temp_blogpost_entities, temp_narratives_checked, "{}", self.blog_ids
-                self.update_insert("insert into tracker_narratives (tid, blogpost_entities, blogpost_narratives, top_entities, query) values (%s, %s, %s, %s, %s)", data, connect)
+                data = self.tid, temp_blogpost_entities, temp_narratives_checked, self.blog_ids
+                self.update_insert("insert into tracker_narratives (tid, blogpost_entities, blogpost_narratives, query) values (%s, %s, %s, %s)", data, connect)
             
         connection.close()
         cursor.close() 
@@ -204,15 +219,26 @@ if __name__ == "__main__":
 
     with connection.cursor() as cursor: 
         # Tracker ids
-        trackers = "select tid from trackers"
+        # trackers = "select tid from trackers"
+        trackers = """
+            select t.tid 
+            from trackers t 
+            left join tracker_narratives tn 
+            on t.tid = tn.tid 
+            where t.tid is null 
+            or tn.tid is null
+            or tn.top_entities = "{}"
+            or tn.top_entities is null
+            or tn.blogpost_entities like '{}'
+            or tn.blogpost_narratives like '{}';
+        """
         cursor.execute(trackers)
         records = cursor.fetchall()
 
-        for x in records[2:]:
-
-        # Getting tracker details and blog ids
-        # tid = 8
+         # Getting tracker details and blog ids
+        for x in records:
             tid = x['tid']
+            # tid = 48
             tracker_details = f"""SELECT query from trackers where tid = {tid}"""
             cursor.execute(tracker_details)
             records_tracker = cursor.fetchall()
@@ -223,17 +249,31 @@ if __name__ == "__main__":
     connection.close()
     cursor.close()
 
-
-    # Run for all trackers
-    for tid in tracker_blog_id:
-        parallel = True
-        num_processes = multiprocessing.cpu_count()
-        blog_ids = tracker_blog_id[tid]
+    def runn(tid, blog_ids, parallel, num_processes, connect):
         narr = Narratives(tid, blog_ids, parallel, num_processes, connect)
         narr.main()
+
+
+    # Run for all trackers
+    process_list = []
+    for tid in tracker_blog_id:
+        parallel = True
+        num_processes = multiprocessing.cpu_count() * 2
+        blog_ids = tracker_blog_id[tid]
+
+        runn(tid, blog_ids, parallel, num_processes, connect)
+
+        # p1 = Process(target=runn, args=(tid, blog_ids, parallel, num_processes, connect, ))
+        # p1.start()
+        # process_list.append(p1)
+
+    # for p in process_list:
+    #     p.join()
+
+        
 
         end = time.time()
         runtime_mins, runtime_secs = divmod(end - start, 60)
         runtime_mins = round(runtime_mins, 0)
         runtime_secs = round(runtime_secs, 0)
-        print("Time to complete: {} Mins {} Secs".format(runtime_mins, runtime_secs), f'AT - {datetime.today().isoformat()}')
+        print("Time to complete: {} Mins {} Secs".format(runtime_mins, runtime_secs), f'AT - {datetime.today().isoformat()}')   
