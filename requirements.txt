@@ -1,1 +1,7 @@
-nltk
+pathos==0.2.6
+tqdm==4.48.2
+nltk==3.5
+scipy==1.5.2
+PyMySQL==0.10.0
+mysql-connector-python
+mysql_connector_repackaged==0.3.1
