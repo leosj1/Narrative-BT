@@ -35,7 +35,7 @@ def process_narratives(connect, parallel, num_processes):
 
     with connection.cursor() as cursor:
         # Getting blogpost_id and posts from blogposts table
-        query = f"""SELECT blogpost_id, post FROM blogtrackers.blogposts where blogpost_id not in (select blogpost_id from narratives)"""
+        query = f"""SELECT blogpost_id, blogsite_id, post FROM blogtrackers.blogposts where blogpost_id not in (select blogpost_id from narratives)"""
         # query = f"""SELECT blogpost_id, post, blogsite_id FROM blogtrackers.blogposts"""
         cursor.execute(query)
         records = cursor.fetchall()
@@ -101,7 +101,7 @@ def process_posts(record):
 
     connect = 'cosmos-1.host.ualr.edu', 'ukraine_user', 'summer2014', 'blogtrackers'
     s = SqlFuncs(connect)
-    # connection = s.get_connection(connect)
+    connection = s.get_connection(connect)
 
     # parameters = tid, blogpostID, blog_ids, post, objectEntitiesList, connect, ListSentences_Unique = [], entity_narrative_dict_list = [], countSentTotal = 0, countSentFiltered = 0, countSentFilteredTriplet = 0, textSentString = ''
 
@@ -175,5 +175,5 @@ def process_posts(record):
 
 if __name__ == "__main__":
     parallel = True
-    num_processes = 12
+    num_processes = 24
     process_narratives(connect, parallel, num_processes)

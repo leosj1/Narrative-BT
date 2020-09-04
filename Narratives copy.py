@@ -42,6 +42,38 @@ class Narratives(SqlFuncs, Functions):
     def main(self):
         connection = self.get_connection(self.connect)
         with connection.cursor() as cursor:
+            # Getting already populated blogpost_id from tracker_narratives table
+            # blogpost_ids_query = f"""
+            #                         SELECT JSON_KEYS(blogpost_narratives) AS blogpost_id
+            #                         from tracker_narratives
+            #                         where tid = {self.tid}
+            #                     """
+            # cursor.execute(blogpost_ids_query)
+            # results = cursor.fetchall()
+            # if results:
+            #     blogpost_ids = results[0]['blogpost_id']
+            #     if blogpost_ids != '[]':
+            #         query1 = f"""
+            #                 SELECT a.blogpost_id, a.narratives, a.entity_count
+            #                 FROM (
+            #                     SELECT blogpost_id, narratives, entity_count
+            #                     FROM narratives
+            #                     where {self.blog_ids}
+            #                     ) a
+            #                 where a.blogpost_id not in {blogpost_ids.replace('[','(').replace(']',')')}
+            #             """
+            #     else:
+            #         query1 = f"""
+            #                     SELECT blogpost_id, narratives, entity_count
+            #                     FROM narratives
+            #                     where {self.blog_ids}
+            #             """
+            # else:
+            #     query1 = f"""
+            #                 SELECT blogpost_id, narratives, entity_count
+            #                 FROM narratives
+            #                 where {self.blog_ids}
+            #         """
 
             query1 = f"""
                             SELECT blogpost_id, narratives, entity_count 
@@ -50,6 +82,11 @@ class Narratives(SqlFuncs, Functions):
                             limit 10
                     """
 
+            # Getting narratives from narratives table
+
+            # self.blog_ids = self.blog_ids.replace('blogsite_id in', 'b.blogsite_id in')
+            # query1 = f"""SELECT n.blogpost_id blogpost_id, n.narratives narratives, n.entity_count entity_count FROM blogposts b left join narratives n on b.blogpost_id = n.blogpost_id where {self.blog_ids} and b.blogpost_id not in {blogpost_ids.replace('[','(').replace(']',')')}"""
+
             cursor.execute(query1)
             records = cursor.fetchall()
 
@@ -57,35 +94,17 @@ class Narratives(SqlFuncs, Functions):
         cursor.close()
 
         self.process_main(records)
-
-        # Updating the DB from the json file
-        f = open(f'json_files/tid_{self.tid}.json', 'rb')
-        data = json.load(f)
-
-        connection = self.get_connection(self.connect)
-        with connection.cursor() as cursor:
-            narratives_query = f"""select blogpost_narratives, top_entities from tracker_narratives where tid = {self.tid}"""
-            cursor.execute(narratives_query)
-            narratives_record = cursor.fetchall()
-
-            if narratives_record:
-                data = json.dumps(
-                    data['blogpost_narratives']), self.blog_ids, self.tid
-                self.update_insert(
-                    "update tracker_narratives set blogpost_narratives = %s, query = %s where tid = %s", data, connect)
-            else:
-                data = self.tid, json.dumps(
-                    data['blogpost_narratives']), self.blog_ids
-                self.update_insert(
-                    "insert into tracker_narratives (tid, blogpost_narratives, query) values (%s, %s, %s)", data, connect)
-        connection.close()
-        cursor.close()
-
-        # Getting top entities for tracker
         self.process_entity_count()
 
+        # p2 = Process(target=self.process_main, args=(records, ))
+        # p1 = Process(target=self.process_entity_count)
+        # p2.start()
+        # p1.start()
+        # p2.join()
+        # p1.join()
 
     # process data in parallel or single process
+
     def process_main(self, records):
         if not self.parallel:
             for record in tqdm(records, total=len(records), desc=f"Narratives - TID_{self.tid}"):
@@ -98,6 +117,14 @@ class Narratives(SqlFuncs, Functions):
                 for _ in pbar:
                     pbar.update(1)
 
+            # process_pool = ProcessPool(self.num_processes)
+            # pbar = tqdm(process_pool.imap(self.process_data, records), desc="Narratives", ascii=True,  file=sys.stdout, total=len(records))
+            # for x in pbar:
+            #     pbar.update(1)
+
+            # for record in tqdm(process_pool.imap(self.process_data, records), desc=f"Narratives - TID_{self.tid}", ascii=True,  file=sys.stdout, total=len(records)):
+            #     pass
+
             print("Finished processing!")
             print("\nClosing pool")
             p.close()
@@ -108,6 +135,7 @@ class Narratives(SqlFuncs, Functions):
             print("Finished!")
 
     # Getting top terms from entity_count field for selected narratives
+
     def process_entity_count(self):
         connection = self.get_connection(connect)
         with connection.cursor() as cursor:
@@ -154,6 +182,7 @@ class Narratives(SqlFuncs, Functions):
         print('top_entity done')
 
     # Process, insert or update narratives for tracker
+
     def process_data(self, record):
         connection = self.get_connection(connect)
         with connection.cursor() as cursor:
@@ -167,25 +196,43 @@ class Narratives(SqlFuncs, Functions):
 
             blogpost_narratives_file = {}
             temp_narratives_checked = {}
-            temp_narratives_checked[str(blogpostID)] = ast.literal_eval(
-                data_narratives)
+            temp_narratives_checked[str(blogpostID)] = ast.literal_eval(data_narratives)
             blogpost_narratives_file['blogpost_narratives'] = temp_narratives_checked
 
-            error = False
-            try:
-                f = open(f'json_files/tid_{self.tid}.json', 'rb')
-            except Exception as e:
-                if 'No such file or directory' in str(e):
-                    error = True
-                    with open(f'json_files/tid_{self.tid}.json', 'w') as json_file:
-                        json.dump(blogpost_narratives_file, json_file)
+            with open(f'json_files/tid_{self.tid}.json', 'w') as json_file:
+                json.dump(blogpost_narratives_file, json_file)
 
-            if not error:
-                data = json.load(f)
-                data['blogpost_narratives'][str(
-                    blogpostID)] = ast.literal_eval(data_narratives)
-                with open(f'json_files/tid_{self.tid}.json', 'w') as json_file:
-                    json.dump(data, json_file)
+            # if narratives_record:
+                # blogpost_entities_checked = json.loads(narratives_record[0]['blogpost_entities']) if narratives_record[0]['blogpost_entities'] else {}
+                # blogpost_entities_checked[str(blogpostID)] = json.loads(entity_count)
+
+                # blogpost_entities_checked = json.dumps(blogpost_entities_checked)
+                # bp_narratives_checked = json.loads(narratives_record[0]['blogpost_narratives']) if narratives_record[0]['blogpost_narratives'] else {}
+                # bp_narratives_checked[str(blogpostID)] = json.loads(data_narratives)
+                # bp_narratives_checked = json.dumps(bp_narratives_checked)
+
+                # data = blogpost_entities_checked, bp_narratives_checked, self.blog_ids, self.tid
+
+                # f = open(f'json_files/tid_{self.tid}.json', 'rb')
+                # data = json.load(f)
+                # temp_dict = data['blogpost_narratives_file']
+                # data = json.dumps(record['blogpost_narratives']), self.blog_ids, self.tid
+                # self.update_insert("update tracker_narratives set blogpost_narratives = %s, query = %s where tid = %s", data, connect)
+            # else:
+                # temp_blogpost_entities = {}
+                # temp_blogpost_entities[str(blogpostID)] = json.loads(entity_count)
+                # temp_blogpost_entities = json.dumps(temp_blogpost_entities)
+
+                # temp_narratives_checked = {}
+                # temp_narratives_checked[str(blogpostID)] = ast.literal_eval(data_narratives)
+                # temp_narratives_checked = json.dumps(temp_narratives_checked)
+
+                # # terms_sorted = json.dumps({k: int(v) for k, v in sorted(ast.literal_eval(entity_count).items(), key=lambda item: item[1], reverse = True) if k != '.'})
+                # data = self.tid, temp_blogpost_entities, temp_narratives_checked, self.blog_ids
+                # data = self.tid, json.dumps(record['blogpost_narratives']), self.blog_ids
+                # self.update_insert("insert into tracker_narratives (tid, blogpost_narratives, query) values (%s, %s, %s)", data, connect)
+
+
 
         connection.close()
         cursor.close()
@@ -244,6 +291,13 @@ if __name__ == "__main__":
         blog_ids = tracker_blog_id[tid]
 
         runn(tid, blog_ids, parallel, num_processes, connect)
+
+        # p1 = Process(target=runn, args=(tid, blog_ids, parallel, num_processes, connect, ))
+        # p1.start()
+        # process_list.append(p1)
+
+    # for p in process_list:
+    #     p.join()
 
         end = time.time()
         runtime_mins, runtime_secs = divmod(end - start, 60)
