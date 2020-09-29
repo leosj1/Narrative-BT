@@ -25,7 +25,8 @@ from builtins import dict
 from sql import SqlFuncs
 from functions import pos_tag_narratives, run_comprehensive, entity_narratives
 
-connect = 'cosmos-1.host.ualr.edu', 'ukraine_user', 'summer2014', 'blogtrackers'
+# connect = 'cosmos-1.host.ualr.edu', 'ukraine_user', 'summer2014', 'blogtrackers'
+connect = '144.167.35.89', 'db_mover', 'Cosmos1', 'blogtrackers'
 s = SqlFuncs(connect)
 connection = s.get_connection(connect)
 
@@ -99,9 +100,15 @@ def process_posts(record):
     from sql import SqlFuncs
     from functions import pos_tag_narratives, run_comprehensive, entity_narratives
 
-    connect = 'cosmos-1.host.ualr.edu', 'ukraine_user', 'summer2014', 'blogtrackers'
+    # connect = 'cosmos-1.host.ualr.edu', 'ukraine_user', 'summer2014', 'blogtrackers'
+    connect = '144.167.35.89', 'db_mover', 'Cosmos1', 'blogtrackers'
     s = SqlFuncs(connect)
     connection = s.get_connection(connect)
+
+    # connect_mover = '144.167.35.89', 'db_mover', 'Cosmos1', 'blogtrackers'
+    # s_mover = SqlFuncs(connect_mover)
+    # connection_mover = s_mover.get_connection(connect_mover)
+    
 
     # parameters = tid, blogpostID, blog_ids, post, objectEntitiesList, connect, ListSentences_Unique = [], entity_narrative_dict_list = [], countSentTotal = 0, countSentFiltered = 0, countSentFilteredTriplet = 0, textSentString = ''
 
@@ -171,7 +178,9 @@ def process_posts(record):
 
     if 'Duplicate entry' in s.update_insert('''INSERT INTO narratives (blogpost_id, blogsite_id, narratives, entity_count) values (%s, %s, %s, %s) ''', (blogpostID, record['blogsite_id'], json.dumps(data_narratives), json.dumps(entity_count)), connect):
         s.update_insert('''UPDATE narratives SET narratives=%s, entity_count = %s, blogsite_id = %s WHERE blogpost_id=%s;  ''', (json.dumps(data_narratives), json.dumps(entity_count), record['blogsite_id'], blogpostID), connect)
-        # s.update_insert('''UPDATE narratives SET blogsite_id = %s WHERE blogpost_id=%s;  ''', (record['blogsite_id'], blogpostID), connect)
+    # if 'Duplicate entry' in s_mover.update_insert('''INSERT INTO narratives (blogpost_id, blogsite_id, narratives, entity_count) values (%s, %s, %s, %s) ''', (blogpostID, record['blogsite_id'], json.dumps(data_narratives), json.dumps(entity_count)), connect_mover):
+    #     s_mover.update_insert('''UPDATE narratives SET narratives=%s, entity_count = %s, blogsite_id = %s WHERE blogpost_id=%s;  ''', (json.dumps(data_narratives), json.dumps(entity_count), record['blogsite_id'], blogpostID), connect_mover)
+
 
 if __name__ == "__main__":
     parallel = True
