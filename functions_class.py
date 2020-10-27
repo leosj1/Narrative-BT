@@ -13,6 +13,7 @@ tokenizer = RegexpTokenizer(r'\w+')
 import re
 import math
 import scipy.stats as stats
+import configparser
 
 class Functions():
     stop_words = []
@@ -333,3 +334,16 @@ class Functions():
                         new_count = entity_count[entity] + 1
                         entity_count[entity] = new_count
         return entity_narratives_dict
+
+    
+    def get_config(self):
+        config = configparser.ConfigParser()
+        config.read(r"C:\Narrative-BT\config.ini")
+
+        DB_MOVER=config["DB_MOVER"]
+        ip = DB_MOVER["HOST"]
+        user_name = DB_MOVER["USER"] 
+        password =  DB_MOVER["PASS"]
+        db = DB_MOVER["DB"]
+
+        return ip, user_name, password, db

@@ -65,8 +65,10 @@ class SqlFuncs():
                 connection.commit()
             except Exception as e:
                 if 'Duplicate entry' in str(e):
+                    connection.close()
                     return str(e)
                 else:
+                    connection.close()
                     return ''
             
         connection.close()

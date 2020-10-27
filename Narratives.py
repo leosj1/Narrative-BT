@@ -26,7 +26,7 @@ from functions_class import Functions
 import os
 
 # Database connection
-connect = '144.167.35.89', 'db_mover', 'Cosmos1', 'blogtrackers'
+connect = Functions().get_config()
 # connect_mover = '144.167.35.89', 'db_mover', 'Cosmos1', 'blogtrackers'
 file_lock = RLock()
 
@@ -51,7 +51,7 @@ def runn(PARAMS):
     import os
 
     # connect = 'cosmos-1.host.ualr.edu', 'ukraine_user', 'summer2014', 'blogtrackers'
-    connect = '144.167.35.89', 'db_mover', 'Cosmos1', 'blogtrackers'
+    connect = Functions().get_config()
     file_lock = RLock()
 
     class Narratives(SqlFuncs, Functions):
@@ -270,7 +270,7 @@ if __name__ == "__main__":
         # Getting tracker details and blog ids
         for x in records:
             tid = x['tid']
-            # tid = 48
+            tid = 450
             tracker_details = f"""SELECT query from trackers where tid = {tid}"""
             cursor.execute(tracker_details)
             records_tracker = cursor.fetchall()
@@ -302,6 +302,16 @@ if __name__ == "__main__":
         pbar = tqdm(process_pool.imap(runn, DATA), desc="Narratives",ascii=True,  file=sys.stdout, total=len(records))
         for x in pbar:
             pbar.update(1)
+
+        print("Finished processing!")
+
+        print("\nClosing pool")
+        process_pool.close()
+        print("Joining pool")
+        process_pool.join()
+        print("Clearing pool")
+        process_pool.clear()
+        print("Finished!")
 
         end = time.time()
         runtime_mins, runtime_secs = divmod(end - start, 60)

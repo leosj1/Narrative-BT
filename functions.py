@@ -1,5 +1,6 @@
 # Import required libraries
 import nltk
+import json
 
 # nltk.download('punkt')
 # nltk.download('averaged_perceptron_tagger')
@@ -13,6 +14,9 @@ tokenizer = RegexpTokenizer(r'\w+')
 import re
 import math
 import scipy.stats as stats
+from sql import SqlFuncs
+from multiprocessing import Process, Pool, RLock
+import configparser
 
 stop_words = []
 with open("stopwords.txt", "r", encoding="utf-8") as f:
@@ -320,6 +324,8 @@ def run_comprehensive(text):
 """Getting top entities, narratives and posts"""
 def entity_narratives(sentences_scoredList, blogpost_id, objectEntitiesList, entity_count = []):
     entity_narratives_dict = {}
+    file_lock = RLock()
+    # with file_lock:
     
     for narr in sentences_scoredList:
         for entity in objectEntitiesList:
@@ -335,5 +341,77 @@ def entity_narratives(sentences_scoredList, blogpost_id, objectEntitiesList, ent
                     new_count = res[0][1] + 1
                     entity_count[idx] = {'term':entity,'occurrence':new_count}
 
+                connect = '144.167.35.89', 'db_mover', 'Cosmos1', 'blogtrackers'
+                s = SqlFuncs(connect)
+                connection = s.get_connection(connect)
+
+                # with connection.cursor() as cursor:
+                #     query = f"""SELECT data FROM blogtrackers.entity_narratives where entity = '{entity}'"""
+                #     cursor.execute(query)
+                #     records = cursor.fetchall()
+                    
+                #     if not records:
+                #         doc = [{"narrative": narr, "blogpost_ids": [blogpost_id]}]
+                #         s.update_insert('''INSERT INTO entity_narratives (entity, data) values (%s, %s) ''', (entity, json.dumps(doc)), connect)
+                #     else:
+                #         data = json.loads(records[0]['data'])
+                #         narratives = [(i, x['narrative']) for i,x in enumerate(data) if narr == x['narrative']]
+                #         blogpost_ids = [x['blogpost_ids'][0] for x in data if narr == x['narrative']]
+
+                #         if not narratives:
+                #             doc = {"narrative": narr, "blogpost_ids": [blogpost_id]}
+                #             data.append(doc)
+                #             s.update_insert('''UPDATE entity_narratives SET data = %s WHERE entity = %s''', (json.dumps(data), entity), connect)
+                #         elif blogpost_id not in blogpost_ids:
+                #             narrative_index = narratives[0][0]
+                #             data[narrative_index]['blogpost_ids'].append(blogpost_id)
+                #             s.update_insert('''UPDATE entity_narratives SET data = %s WHERE entity = %s''', (json.dumps(data), entity), connect)
+                # cursor.close()
+                # connection.close()
+
+                # file_name = "entity.json"
+                # f = open(file_name, 'r')
+                # try:
+                #     d = json.load(f)
+                # except Exception as e:
+                #     if 'line 1 column 1' in str(e):
+                #         d = {}
+                # records = d[entity] if entity in d else None
+
+                # if not records:
+                #     doc = [{"narrative": narr, "blogpost_ids": [blogpost_id]}]
+                #     d[entity] = doc
+                #     with open(file_name, "w") as outfile: 
+                #         outfile.write(json.dumps(d))
+                # else:
+                #     data = d[entity]
+                #     narratives = [(i, x['narrative']) for i,x in enumerate(data) if narr == x['narrative']]
+                #     blogpost_ids = [x['blogpost_ids'][0] for x in data if narr == x['narrative']]
+
+                #     if not narratives:
+                #         doc = {"narrative": narr, "blogpost_ids": [blogpost_id]}
+                #         data.append(doc)
+                #         d[entity] = data
+                #         with open(file_name, "w") as outfile: 
+                #             outfile.write(json.dumps(d))
+                #     elif blogpost_id not in blogpost_ids:
+                #         narrative_index = narratives[0][0]
+                #         data[narrative_index]['blogpost_ids'].append(blogpost_id)
+
+                #         d[entity] = data
+                #         with open(file_name, "w") as outfile: 
+                #             outfile.write(json.dumps(d))
 
     return entity_narratives_dict
+
+def get_config():
+    config = configparser.ConfigParser()
+    config.read(r"C:\Narrative-BT\config.ini")
+
+    DB_MOVER=config["DB_MOVER"]
+    ip = DB_MOVER["HOST"]
+    user_name = DB_MOVER["USER"] 
+    password =  DB_MOVER["PASS"]
+    db = DB_MOVER["DB"]
+
+    return ip, user_name, password, db

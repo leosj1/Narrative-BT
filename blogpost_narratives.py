@@ -23,10 +23,10 @@ from tqdm import tqdm
 import collections, functools, operator 
 from builtins import dict
 from sql import SqlFuncs
-from functions import pos_tag_narratives, run_comprehensive, entity_narratives
+from functions import pos_tag_narratives, run_comprehensive, entity_narratives, get_config
 
 # connect = 'cosmos-1.host.ualr.edu', 'ukraine_user', 'summer2014', 'blogtrackers'
-connect = '144.167.35.89', 'db_mover', 'Cosmos1', 'blogtrackers'
+connect =  get_config()
 s = SqlFuncs(connect)
 connection = s.get_connection(connect)
 
@@ -36,8 +36,9 @@ def process_narratives(connect, parallel, num_processes):
 
     with connection.cursor() as cursor:
         # Getting blogpost_id and posts from blogposts table
-        query = f"""SELECT blogpost_id, blogsite_id, post FROM blogtrackers.blogposts where blogpost_id not in (select blogpost_id from narratives)"""
-        # query = f"""SELECT blogpost_id, post, blogsite_id FROM blogtrackers.blogposts"""
+        # query = f"""SELECT blogpost_id, blogsite_id, post FROM blogtrackers.blogposts where blogpost_id not in (select blogpost_id from narratives)"""
+        query = f"""SELECT blogpost_id, post, blogsite_id FROM blogtrackers.blogposts limit 40700, 10000000000"""
+        # query = f"""SELECT blogpost_id, post, blogsite_id FROM blogtrackers.blogposts limit 16904, 1000"""
         cursor.execute(query)
         records = cursor.fetchall()
         countPosts = countPosts + 1
@@ -48,22 +49,6 @@ def process_narratives(connect, parallel, num_processes):
 
     if not parallel:
         for record in tqdm(records, total=len(records), desc="Narratives"):
-            # blogpostID = record['blogpost_id']
-            # post = record['post']
-
-            # parameters = {}
-            # parameters['blogpostID'] = blogpostID
-            # parameters['post'] = post
-            # parameters['objectEntitiesList'] = objectEntitiesList
-            # parameters[ 'connect'] = connect
-            # parameters['ListSentences_Unique'] = ListSentences_Unique
-            # parameters['entity_narrative_dict_list'] = entity_narrative_dict_list
-            # parameters['countSentTotal'] = countSentTotal
-            # parameters['countSentFiltered'] = countSentFiltered
-            # parameters['countSentFilteredTriplet'] = countSentFilteredTriplet
-            # parameters['textSentString'] = textSentString
-
-            # parameters = blogpostID, post, objectEntitiesList, connect, ListSentences_Unique, entity_narrative_dict_list, countSentTotal, countSentFiltered, countSentFilteredTriplet, textSentString
             process_posts(record)            
     else:
         print("starting multi-process")
@@ -98,32 +83,12 @@ def process_posts(record):
     import collections, functools, operator 
     from builtins import dict
     from sql import SqlFuncs
-    from functions import pos_tag_narratives, run_comprehensive, entity_narratives
+    from functions import pos_tag_narratives, run_comprehensive, entity_narratives, get_config
 
     # connect = 'cosmos-1.host.ualr.edu', 'ukraine_user', 'summer2014', 'blogtrackers'
-    connect = '144.167.35.89', 'db_mover', 'Cosmos1', 'blogtrackers'
+    connect = get_config()
     s = SqlFuncs(connect)
     connection = s.get_connection(connect)
-
-    # connect_mover = '144.167.35.89', 'db_mover', 'Cosmos1', 'blogtrackers'
-    # s_mover = SqlFuncs(connect_mover)
-    # connection_mover = s_mover.get_connection(connect_mover)
-    
-
-    # parameters = tid, blogpostID, blog_ids, post, objectEntitiesList, connect, ListSentences_Unique = [], entity_narrative_dict_list = [], countSentTotal = 0, countSentFiltered = 0, countSentFilteredTriplet = 0, textSentString = ''
-
-    # blogpostID, post, objectEntitiesList, connect, ListSentences_Unique, entity_narrative_dict_list, countSentTotal, countSentFiltered, countSentFilteredTriplet, textSentString = parameters
-
-    # blogpostID = parameters['blogpostID']
-    # post = parameters['post']
-    # objectEntitiesList = parameters['objectEntitiesList']
-    # connect = parameters['connect']
-    # ListSentences_Unique = parameters['ListSentences_Unique']
-    # entity_narrative_dict_list = parameters['entity_narrative_dict_list']
-    # countSentTotal = parameters['countSentTotal']
-    # countSentFiltered = parameters['countSentFiltered']
-    # countSentFilteredTriplet = parameters['countSentFilteredTriplet']
-    # textSentString = parameters['textSentString']
 
     blogpostID = record['blogpost_id']
     post = record['post']
@@ -172,15 +137,10 @@ def process_posts(record):
     sentences_scored = tokenize.sent_tokenize(result_scored)
     
     entity_count = []
-    # data_narratives = {}
-
     data_narratives = entity_narratives(sentences_scored, blogpostID, objectEntitiesList, entity_count)
 
     if 'Duplicate entry' in s.update_insert('''INSERT INTO narratives (blogpost_id, blogsite_id, narratives, entity_count) values (%s, %s, %s, %s) ''', (blogpostID, record['blogsite_id'], json.dumps(data_narratives), json.dumps(entity_count)), connect):
         s.update_insert('''UPDATE narratives SET narratives=%s, entity_count = %s, blogsite_id = %s WHERE blogpost_id=%s;  ''', (json.dumps(data_narratives), json.dumps(entity_count), record['blogsite_id'], blogpostID), connect)
-    # if 'Duplicate entry' in s_mover.update_insert('''INSERT INTO narratives (blogpost_id, blogsite_id, narratives, entity_count) values (%s, %s, %s, %s) ''', (blogpostID, record['blogsite_id'], json.dumps(data_narratives), json.dumps(entity_count)), connect_mover):
-    #     s_mover.update_insert('''UPDATE narratives SET narratives=%s, entity_count = %s, blogsite_id = %s WHERE blogpost_id=%s;  ''', (json.dumps(data_narratives), json.dumps(entity_count), record['blogsite_id'], blogpostID), connect_mover)
-
 
 if __name__ == "__main__":
     parallel = True
