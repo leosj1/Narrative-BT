@@ -31,17 +31,6 @@ class EntityNarratives(SqlFuncs, Functions, Es):
             f.close()
             last_elem = int(line[0]) - 1
             t = int(line[1])
-            # last_elem = 0
-
-            # query = """
-            # SELECT narratives 
-            # FROM narratives 
-            # WHERE narratives not like '{}' 
-            # AND blogpost_id not in (select distinct blogpost_id from """ + self.index + """)
-            # """
-            # query = """
-            # SELECT narratives FROM narratives where narratives not like '{}' limit 40700, 1000
-            # """
 
             query = """
             SELECT n.narratives, b.date, b.blogsite_id 
@@ -115,16 +104,6 @@ class EntityNarratives(SqlFuncs, Functions, Es):
                     self.actions.append(json_body)
 
         return self.actions
-        # if actions:
-        #     client = self.get_client("144.167.35.89")
-        #     bulk_action = self.bulk_request(client, actions)
-        #     client.transport.close()
-        #     if bulk_action[0] != len(actions):
-        #         print('here')
-
-    # async def process_narratives(self, d):
-    #     dddd = json.loads(d['narratives'])
-    #     return asyncio.gather(*[self._process_narratives(x, dddd) for x in dddd])
 
     def process_narratives(self, d):
         dddd = json.loads(d['narratives'])
@@ -144,14 +123,9 @@ class EntityNarratives(SqlFuncs, Functions, Es):
                     cursor.execute(query)
                     records = cursor.fetchall()
 
-                    # records = await self.exectue(query, None)
-
                     if not records:
                         self.update_insert('''INSERT INTO ''' + self.index + ''' (entity, blogpost_id, narrative) values (%s, %s, %s) ''', (entity, blogpost_id, narr), connect)
-                        # await self.exectue('''INSERT INTO ''' + self.index + ''' (entity, blogpost_id, narrative) values (%s, %s, %s) ''', (entity, blogpost_id, narr))
-                            # else:
-                            #     self.update_insert('''UPDATE ''' + self.index + ''' SET blogpost_id = %s, narrative = %s WHERE entity = %s AND blogpost_id = %s AND narrative = %s''', (blogpost_id, narr, entity, blogpost_id, narr), connect)
-
+                        
             cursor.close()
             connection.close()
 
@@ -167,25 +141,24 @@ if __name__ == "__main__":
     f = open('last_sql.txt', 'r')
     start = f.readline().split('--')[0]
     f.close()
+    actions = []
 
     if not parallel:
         pbar = tqdm(narrative_record, total=len(narrative_record), desc="Narratives")
         for record in pbar:
-            # asyncio.run(EN.process_narratives(record))
-            EN.process_narratives(record)
-            # EN.process_narrative_elastic(record)
-            pbar.update()
-            # f = open('last_sql.txt', 'w')
-            # f.write(str(int(start) + int(pbar.last_print_n)) +
-            #         '--' + str(len(narrative_record)))
-            # f.close()
-        # actions = EN.actions
-        # if actions:
-        #     client = EN.get_client("144.167.35.89")
-        #     bulk_action = EN.bulk_request(client, actions)
-        #     client.transport.close()
-        #     if bulk_action[0] != len(actions):
-        #         print('here')
+            d = EN.process_narrative_elastic(record)
+            actions+=d
+
+            client = EN.get_client("144.167.35.89")
+            bulk_action = EN.bulk_request(client, d)
+            client.transport.close()
+            if bulk_action[0] != len(d):
+                print('here')
+
+            f = open('last_sql.txt', 'w')
+            f.write(str(int(start) + int(pbar.last_print_n)) +
+                    '--' + str(len(narrative_record)))
+            f.close()
 
     else:
         print("starting multi-process")
@@ -211,14 +184,6 @@ if __name__ == "__main__":
                     f.write(str(int(start) + int(pbar.last_print_n)) +
                             '--' + str(len(narrative_record)))
                     f.close()
-
-
-        # if actions:
-        #     client = EN.get_client("144.167.35.89")
-        #     bulk_action = EN.bulk_request(client, actions)
-        #     client.transport.close()
-        #     if bulk_action[0] != len(actions):
-        #         print('here')
 
         print("Finished processing!")
 
