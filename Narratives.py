@@ -270,7 +270,7 @@ if __name__ == "__main__":
         # Getting tracker details and blog ids
         for x in records:
             tid = x['tid']
-            tid = 450
+            # tid = 450
             tracker_details = f"""SELECT query from trackers where tid = {tid}"""
             cursor.execute(tracker_details)
             records_tracker = cursor.fetchall()
@@ -292,7 +292,7 @@ if __name__ == "__main__":
         DATA.append(PARAMS)
 
     # Run for all trackers
-    parallel_main = False
+    parallel_main = True
     num_processes_main = 12
 
     if parallel_main:

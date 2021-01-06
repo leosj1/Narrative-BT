@@ -2,10 +2,54 @@ import pymysql
 import json
 import time
 import os
+import asyncio
+import aiomysql
+from tqdm import tqdm
 
 class SqlFuncs(): 
     def __init__(self, conn):
         self.conn = conn
+
+    def run(self, debug=False):
+        asyncio.run(self._run_all(), debug=debug)
+
+    async def _run_all(self):
+        self.pool = await aiomysql.create_pool(host=self.host, port=3306,
+                                      user=self.user, password=self.password, db=self.db, maxsize=20)
+        [await f for f in tqdm(asyncio.as_completed(self.tasks),
+            total=len(self.tasks), desc="SQL")]
+        self.pool.close()
+        await self.pool.wait_closed()
+
+
+    async def exectue(self, query, data):
+        try:
+            async with self.pool.acquire() as conn:
+                async with conn.cursor(aiomysql.DictCursor) as cur:
+                    if data: 
+                        await cur.execute(query, data)
+                        await conn.commit()
+                    else: await cur.execute(query)
+                    records = await cur.fetchall()
+            conn.close()
+            return records
+        except (AttributeError, pymysql.err.OperationalError):
+            #asyncio.exceptions.IncompleteReadError: X bytes read on a total of Y expected bytes
+            # print("\nFailed to recieve all the data from the db. Re-running the query as blocking.")
+            return self.block_execute(query, data)
+
+    def block_execute(self, query, data):
+        host, user, password, db = self.connect
+        connection = pymysql.connect(host=host, user=user, 
+            password=password, db=db, cursorclass=pymysql.cursors.DictCursor)
+        with connection.cursor() as cursor:
+            if data: 
+                cursor.execute(query, data)
+                connection.commit()
+            else: cursor.execute(query)
+            records = cursor.fetchall()
+        connection.close()
+        return records
 
     def get_connection(self, conn):
         count = 0
